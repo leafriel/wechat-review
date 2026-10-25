@@ -1,0 +1,18 @@
+{
+  "name": "wechat-question-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "login": "node src/login.mjs",
+    "test": "node --test test/*.test.mjs",
+    "status": "node src/status.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "qrcode": "1.5.4",
+    "zod": "^4.3.6"
+  }
+}

@@ -1,0 +1,15 @@
+node_modules/
+*.log
+account.json
+login-qr.png
+*.dpapi
+*.enc
+*.tmp
+.env
+.env.*
+!.env.example
+poll.lock
+broker.sock
+verification.json
+test-question.json
+.planning/
