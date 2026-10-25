@@ -1,7 +1,7 @@
 interface:
   display_name: "微信审核"
-  short_description: "在桌面与本人微信审核需求、方案及关键操作，标注来源对话并接收数字选项回复"
-  default_prompt: "使用 $wechat-review 将本次需求选择和最终执行确认同时发送到桌面与微信。"
+  short_description: "让 coding agent 通过本人微信审核需求、方案和关键操作，支持来源标注与并发数字答题"
+  default_prompt: "使用 $wechat-review 将本次选择发送到微信，并在宿主支持时同步发出本地问题。"
 
 policy:
   allow_implicit_invocation: true

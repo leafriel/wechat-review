@@ -76,7 +76,7 @@ try {
     }
   }
   if (!account.contextToken) throw new Error('等待微信绑定消息超时。');
-  await api.send(account, 'Codex 微信问答已连接。之后收到问题时，请按提示回复“题号 选项编号”。', deadline);
+  await api.send(account, '微信审核已连接。之后收到问题时，请按提示回复“题号 选项编号”。', deadline);
   console.log(JSON.stringify({ event: 'connected', owner_bound: true, context_ready: true }));
 } catch (error) {
   console.error(error.message);

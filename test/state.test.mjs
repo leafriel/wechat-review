@@ -7,7 +7,7 @@ import { StateStore, acquireLock, nextQuestionId, markQuestionsIdle, QUESTION_ID
 import { memoryStore } from './helpers/fake-wechat.mjs';
 
 test('Windows DPAPI round trip preserves Unicode and never stores a plaintext token', { skip: process.platform !== 'win32' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wechat-mcp-state-'));
+  const dir = mkdtempSync(join(tmpdir(), 'wechat-review-state-'));
   try {
     const store = new StateStore(dir);
     const account = { token: 'not-plaintext-123', ownerId: '本人', contextToken: '上下文' };
@@ -18,7 +18,7 @@ test('Windows DPAPI round trip preserves Unicode and never stores a plaintext to
 });
 
 test('concurrent receivers are rejected and a dead process lock can be recovered', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wechat-mcp-lock-'));
+  const dir = mkdtempSync(join(tmpdir(), 'wechat-review-lock-'));
   try {
     const release = acquireLock(dir);
     assert.throws(() => acquireLock(dir), /已有微信提问/);
@@ -30,7 +30,7 @@ test('concurrent receivers are rejected and a dead process lock can be recovered
 });
 
 test('question numbers start at one and survive a new store and account re-login', { skip: process.platform !== 'win32' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wechat-mcp-counter-'));
+  const dir = mkdtempSync(join(tmpdir(), 'wechat-review-counter-'));
   try {
     assert.equal(nextQuestionId(new StateStore(dir)), '1');
     const reopened = new StateStore(dir);
@@ -67,7 +67,7 @@ test('active questions prevent reset even if persisted idle metadata is old', ()
 });
 
 test('idle timestamp survives a reopened encrypted store', { skip: process.platform !== 'win32' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wechat-mcp-idle-'));
+  const dir = mkdtempSync(join(tmpdir(), 'wechat-review-idle-'));
   try {
     const store = new StateStore(dir);
     assert.equal(nextQuestionId(store, { now: 1000 }), '1');

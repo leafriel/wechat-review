@@ -3,7 +3,7 @@ import { ILink, ownerMessages, messageText, updateAccount } from './ilink.mjs';
 import { nextQuestionId, markQuestionsIdle } from './state.mjs';
 import { conversationSchema } from './schema.mjs';
 
-export function parseAnswer(text, questionId, options, allowText = true) {
+export function parseAnswer(text, questionId, options, allowText = false) {
   const match = text.trim().match(/^([1-9]\d*)\s+([\s\S]+)$/);
   if (!match || match[1] !== String(questionId)) return null;
   const answer = match[2].trim();
@@ -44,7 +44,7 @@ export class QuestionRouter {
     }
     const questionId = nextQuestionId(this.store, { now: this.now(), hasPending: this.pending.size > 0 });
     const text = [
-      `Codex 等你选择【${questionId}】`,
+      `微信审核【${questionId}】`,
       `对话：${conversation}`,
       input.context ? `任务：${input.context}` : '', input.question,
       ...input.options.map((option, index) => `${index + 1}. ${option}`),

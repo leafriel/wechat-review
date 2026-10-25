@@ -40,7 +40,7 @@ test('chat, unnumbered agreement and other owners cannot complete a final confir
   let finished = false;
   const resultPromise = router.ask(confirmation).then(result => { finished = true; return result; });
   await channel.waitForSends(1);
-  channel.deliver([ownerMessage('@codex 请执行'), ownerMessage('同意执行'),
+  channel.deliver([ownerMessage('@agent 请执行'), ownerMessage('同意执行'),
     ownerMessage('1 1', { from_user_id: 'intruder' }), ownerMessage('1 好的')]);
   await channel.waitForSends(2); // Invalid numbered free text gets a format reminder.
   await delay(5);

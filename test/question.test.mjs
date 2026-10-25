@@ -18,6 +18,7 @@ test('numeric question IDs match exactly; invalid options never select a default
   assert.deepEqual(parseAnswer('1 99', '1', input.options), { status: 'invalid' });
   assert.deepEqual(parseAnswer('1 取消', '1', input.options), { status: 'cancelled' });
   assert.deepEqual(parseAnswer('1 稍后再说', '1', input.options, false), { status: 'invalid' });
+  assert.deepEqual(parseAnswer('1 稍后再说', '1', input.options), { status: 'invalid' });
 });
 
 test('parallel questions accept out-of-order replies only for the owner and correct question', async t => {

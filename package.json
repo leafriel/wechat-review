@@ -1,17 +1,16 @@
 {
-  "name": "wechat-question-mcp",
+  "name": "wechat-question-skill",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "engines": { "node": ">=22" },
   "scripts": {
-    "start": "node src/server.mjs",
-    "login": "node src/login.mjs",
+    "start": "node scripts/cli.mjs ask",
+    "login": "node scripts/cli.mjs login",
     "test": "node --test test/*.test.mjs",
-    "status": "node src/status.mjs"
+    "status": "node scripts/cli.mjs status"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.32.1",
     "qrcode": "1.5.4",
     "zod": "^4.3.6"
   }

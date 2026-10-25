@@ -64,14 +64,14 @@ export class ILink {
   }
   updates(cursor = '', signal, timeoutMs = 40000) {
     return this.request('ilink/bot/getupdates', {
-      body: { get_updates_buf: cursor, base_info: { channel_version: '2.4.10', bot_agent: 'CodexWeChatQuestion/0.1.0' } }, signal, timeoutMs,
+      body: { get_updates_buf: cursor, base_info: { channel_version: '2.4.10', bot_agent: 'WeChatQuestionSkill/0.1.0' } }, signal, timeoutMs,
     });
   }
   send(account, text, signal) {
     if (!account.ownerId || !account.contextToken) throw new Error('请先在微信给机器人发送“绑定”，完成首次连接。');
     return this.request('ilink/bot/sendmessage', {
       body: {
-        base_info: { channel_version: '2.4.10', bot_agent: 'CodexWeChatQuestion/0.1.0' },
+        base_info: { channel_version: '2.4.10', bot_agent: 'WeChatQuestionSkill/0.1.0' },
         msg: {
           from_user_id: '', to_user_id: account.ownerId, client_id: randomUUID(),
           message_type: 2, message_state: 2,

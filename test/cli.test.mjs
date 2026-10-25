@@ -3,9 +3,15 @@ import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import { askFromStream } from '../scripts/cli.mjs';
+import { questionSchema } from '../src/schema.mjs';
 
 const question = { conversation_title: '脚本来源对话', question: '选哪一个？', options: ['a', 'b', 'c'] };
 const line = JSON.stringify(question) + '\n';
+
+test('共享输入边界默认禁止文字，显式开启仍可用', () => {
+  assert.equal(questionSchema.parse(question).allow_text, false);
+  assert.equal(questionSchema.parse({ ...question, allow_text: true }).allow_text, true);
+});
 
 test('首行 JSON 不等待 EOF 即开始；stdin 关闭不取消；默认禁止文字', async () => {
   const input = new PassThrough();

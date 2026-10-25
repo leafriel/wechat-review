@@ -61,7 +61,7 @@ export async function startBroker({ store = new StateStore(), makeClient, idleMs
 
   function armIdle() {
     clearTimeout(idleTimer);
-    if (!router.pending.size && !closing) idleTimer = setTimeout(() => { void close(); }, idleMs);
+    if (!router.pending.size && !router.closed && !closing) idleTimer = setTimeout(() => { void close(); }, idleMs);
   }
   function close() {
     if (closing) return closing;
