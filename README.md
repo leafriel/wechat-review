@@ -1,90 +1,78 @@
-# 微信问答 MCP
+# 微信审核 Skill 与 MCP
 
-把 Codex 等 MCP 客户端的需求澄清、方案选择和执行确认发到本人微信，收到回答后，在原调用会话继续。**当前仅支持 Windows，需 Node.js 22+。**
+在原调用对话中，通过 Codex 原生桌面卡片和本人微信收集需求选择、方案审核与最终执行确认。**当前仅支持 Windows、Node.js 22+。**
 
-## 功能与边界
+本仓库同时是可独立安装的 `wechat-review` Skill 包和兼容的 MCP server。Skill 直接运行本机脚本，不需要配置或启动 MCP 服务；两种入口共享同一份微信运行代码和用户状态。
 
-- **多会话并发**：同一 Windows 用户的多个会话共享一个接收器；每题独立路由，可乱序回答，某题取消、超时、发送失败或调用方断开不会取消其他题。
-- **简单题号**：全局数字从 `1` 递增，发送前持久保存，失败可能跳号。最后一道待答题结束后连续空闲满 24 小时，下一题从 `1` 开始；有待答题时不重置，空闲时间跨进程退出、重启和重新登录保留。旧计数器首次升级时从接收器启动开始记录空闲。
-- **选项、文字和取消**：微信回复 `1 2` 表示第 1 题选第 2 项；允许文字时可回复 `1 文字答案`；回复 `1 取消` 或 `1 cancel` 取消。只接受已绑定本人的单聊文字，裸数字、其他人的消息及群聊不会作为答案。
-- **桌面与微信同步**：可选的本机浏览器面板显示同一题，首先回答的渠道生效，题目和选项自动收起；桌面先答会取消本题微信等待，迟到回复失效。微信原消息仍保留为聊天记录，已有原生 Codex 问答卡片无法撤回。
-- **本机安全存储**：账号、游标、上下文令牌、题号与 IPC 认证令牌用 Windows DPAPI 加密，默认保存在 `%LOCALAPPDATA%/CodexWeChatQuestion`；可用 `WECHAT_QUESTION_STATE_DIR` 覆盖目录。共享接收器使用需认证的命名管道。可选桌面面板使用随机端口，仅监听 `127.0.0.1`，以每题随机 URL 和来源校验保护；不加载外部资源、不向页面提供微信凭据。
-- **按需运行**：首次提问自动启动接收器，空闲 60 秒退出；没有开机启动任务。电脑、网络和发起任务的客户端须保持运行；接收器异常退出时未完成的调用报错，不替用户选择，需要重新提问。
+## 安装 Skill
 
-MCP 提供微信问答及可选桌面面板。它不接管现有桌面会话、不拦截内置提问或平台权限弹窗，不提供 `@codex` 聊天、自动任务完成通知，也不支持 macOS/Linux。是否继续执行由原调用代理根据结果决定。
+源码仓库：[leafriel/wechat-question-skill](https://github.com/leafriel/wechat-question-skill)。
 
-## 安装与连接
+取得本仓库的干净源码，将完整 Skill 包放入用户目录 `~/.agents/skills/wechat-review`，包含 `SKILL.md`、`agents`、`scripts`、`src`、依赖清单及本文档。不要复制 `.git`、`node_modules`、凭据、个人验证记录或 `.planning`。在安装目录运行：
 
 ```powershell
-git clone https://github.com/leafriel/wechat-question-mcp.git
-cd wechat-question-mcp
 npm ci --ignore-scripts
-npm run login
-npm run status
+node scripts/cli.mjs status
+node scripts/cli.mjs login
 ```
 
-扫描 `login` 输出路径中的二维码，在手机确认，再给刚绑定的机器人发送“绑定”。微信发送依赖有效登录和本人消息中的 `context_token`；登录过期用 `npm run login -- --force` 重新扫码。会话上下文失效、题目未送达时，在机器人聊天发送“绑定”：工具会在原等待时限内接收本人新上下文，用原题号重试，超过原超时后需重新提问。仅明确的上下文拒绝会重试，网络超时等发送结果不明的情况不会自动重发。登录程序会先停止空闲接收器；有待答题时须先完成或取消，避免影响其他会话。
+扫描登录输出路径中的二维码，在手机确认，再给刚连接的机器人发送“绑定”。默认状态目录为 `%LOCALAPPDATA%/CodexWeChatQuestion`，可用 `WECHAT_QUESTION_STATE_DIR` 覆盖；安装或升级 Skill 不移动、复制或重置绑定数据。登录过期时运行 `node scripts/cli.mjs login --force`。登录会先停止空闲接收器；有待答题时需先完成或取消，不能打断其他会话。
 
-在 MCP 客户端中配置，例如 Codex 的 `~/.codex/config.toml`（把 Node 和项目路径替换成自己的绝对路径；`node -p "process.execPath"` 可查看 Node 路径）：
+Codex 可通过 `$wechat-review` 显式调用，也可在需要澄清需求、选择方案或最终执行确认时自动匹配。自动匹配取决于客户端和模型，不保证每次触发，不是强制安全门禁。完整流程见 [SKILL.md](SKILL.md)；跨项目使用不需要在各项目写入 `AGENTS.md`。如果技能未出现，刷新技能列表或重启客户端。
+
+## 接口说明
+
+`node scripts/cli.mjs ask` 从 stdin **第一行**读取问题 JSON，立即开始等待，不要求关闭 stdin。示例：
+
+```json
+{"conversation_title":"真实来源对话标题","conversation_id":"真实会话ID，可省略","question":"数据保存在哪里？","options":["本地文件","数据库"],"context":"项目或任务背景","allow_text":false,"timeout_seconds":300}
+```
+
+- `conversation_title`、`conversation_id` 至少提供一个：均为非空单行文本，最多 200 字符。标题优先；没有标题时显示真实 ID，两者都缺失则发送前报错且不占题号。调用方负责提供真实来源，不能用项目名或示例值冒充。
+- `question` 为 1–1500 字符；`options` 为 2–6 个不重复选项，每项 1–200 字符；可选 `context` 最多 200 字符，单独表示任务背景。
+- `timeout_seconds` 为 15–600 的整数，默认 300 秒。直接 CLI 默认 `allow_text: false`；兼容 MCP 默认仍为 `true`，显式 `true` 时可接受最多 2000 字符的文字答案。
+- 保持 stdin 可写时，后续发送独占一行的 `cancel` 可取消本题；SIGINT/SIGTERM 同样取消。首行之后正常关闭 stdin 不表示取消。不要全局停止 broker 来取消单题。
+- 最终 stdout 为一行 JSON；`error` 退出码为 1。只有 `status: answered` 是有效回答，包含 `question_id`、`question`、`answer`、`sent`、`answered_at`；选中选项时另有从 1 开始的 `selected_index`、`selected_option`。`cancelled`、`timeout`、`not_connected`、`error` 都不是同意。
+
+微信消息分别列出来源对话、数字题号、任务背景、问题和选项。用户只需回复 `15 2`，表示第 15 题选第 2 项，无需附带对话名或 ID。取消用 `15 取消` 或 `15 cancel`。仅显式允许文字时才显示文字回复说明；裸数字不会作为答案。
+
+微信发送依赖有效登录和本人消息中的会话上下文。收到上下文失效错误或题目未送达时，在机器人聊天发送“绑定”：接收器会在原有效期内用原题号重试；原有效期结束后需重新提问。只有明确的上下文拒绝会重试，网络超时等发送结果不明的情况不会自动重发。
+
+## 并发与运行边界
+
+- 多个 Skill CLI 和 MCP 会话共享一个接收器，按全局数字题号独立路由，可乱序回答；某题取消、超时、失败或断开不会取消其他题。
+- 题号从 `1` 递增，发送前持久保存，发送失败可能跳号。最后一道待答题结束后连续空闲满 24 小时，下一题从 `1` 开始；有待答题时不重置。计数和空闲时间跨进程重启、重新登录保留；旧计数器首次升级时从接收器启动开始记录空闲。
+- 接收器首次提问时按需启动，空闲 60 秒退出，没有登录启动任务。电脑、网络和原调用方需保持运行；接收器异常退出则待答调用报错，需要重新提问，不替用户选择。
+- 只接受已绑定本人的私聊文字，忽略其他用户、群聊及 `@codex` 聊天；不提供独立模型聊天、自动完成通知、图片或语音问答，也不支持 macOS/Linux。
+- 账号、游标、会话上下文、题号和本机认证令牌使用 Windows DPAPI 加密；接收器通过认证命名管道通信。直接 Skill 入口不开 TCP 端口，不加载 MCP SDK；依赖清单暂留 SDK 供旧 MCP 入口兼容。
+
+## 原生桌面卡片与最终确认
+
+Skill 同时发出原生桌面异步问题和微信题，代理按首先收到的明确有效回答处理一次。桌面先答则取消对应 CLI；微信先答后标记已处理，忽略原生卡片迟到回答。**当前无法保证撤回 Codex 原生卡片，微信首答后卡片可能残留。** 不以浏览器面板代替原生卡片。单渠道不可用时说明并等待另一边；没有有效答案时保留待决定事项。用户主动撤回或提出新要求仍按最新指令处理。
+
+关键操作准备完成后，确认问题说明本次具体操作、目标、影响和实际验证。`context` 固定为“最终执行确认 · 项目名”，来源对话字段仍单独填写；选项为 `["同意执行","暂不执行","修改方案"]`，`allow_text: false`，有效期 600 秒。仅首个有效回答明确选择“同意执行”才执行已说明操作一次；“暂不执行”停止，“修改方案”调整后重新确认。取消、错误、过期或目标实质变化均不能复用答案。确认不替代平台权限审批。
+
+## 兼容 MCP
+
+既有 MCP 入口保留，配置示例（替换为自己的绝对路径）：
 
 ```toml
 [mcp_servers.wechat_question]
 command = 'C:/Program Files/nodejs/node.exe'
-args = ['C:/path/to/wechat-question-mcp/src/server.mjs']
+args = ['C:/path/to/wechat-question-skill/src/server.mjs']
 startup_timeout_sec = 15
 tool_timeout_sec = 660
 enabled = true
 ```
 
-新增配置或升级已加载的服务后，可能需要重连 MCP。工具目录尚未刷新时，可在项目目录调用同一个 SDK 客户端：`node src/call.mjs status`，或将下述 JSON 经 stdin 传给 `node src/call.mjs ask`（仅微信）或 `node src/call.mjs dual`（双渠道）。`dual` 首先输出面板 URL，调用方立即打开它，保持该进程运行，随后读取最终结果；无需另开或恢复 Codex 会话。
+`wechat_status` 返回本地绑定状态，不发消息、不返回凭据，也不代表实时登录一定有效；`ask_wechat` 仍发送并等待单题。**升级后旧调用方也必须补充来源对话字段**，否则返回明确错误。
 
-## 工具与回复
-
-| 工具 | 作用 |
-| --- | --- |
-| `wechat_status` | 读取本地绑定状态，不发消息、不返回凭据；不代表实时登录一定有效 |
-| `ask_wechat` | 发送一题并等待本人回复，返回结构化结果 |
-| `start_question` | 使用相同参数发起双渠道题目，立即返回 `question_handle`、`desktop_url` 和 `expires_at`；调用方立即打开 URL |
-| `wait_question` | 同一 MCP 连接中用 `question_handle` 等待首答；可加 `cancel: true` 仅取消本题 |
-
-```json
-{
-  "question": "数据保存在哪里？",
-  "options": ["本地文件", "数据库"],
-  "context": "数据存储方案",
-  "allow_text": true,
-  "timeout_seconds": 300
-}
-```
-
-参数：`question` 为 1–1500 字符；`options` 为 2–6 个不重复选项，每项 1–200 字符；可选 `context` 最多 200 字符；`allow_text` 默认 `true`；`timeout_seconds` 为 15–600 的整数，默认 300 秒。文字答案最多 2000 字符。
-
-`ask_wechat` 只有 `status: answered` 表示回答成功，包含 `question_id`、`question`、`answer`、`sent`、`answered_at`；选中选项时另有从 1 开始的 `selected_index` 和 `selected_option`。`cancelled`、`timeout`、`not_connected`、`error` 都不是同意，不能据此执行待确认操作。
-
-双渠道结果另含 `question_handle` 和 `channel: desktop|wechat`；桌面首答没有微信 `question_id`、`sent` 字段。未绑定、发送失败或微信超时时仍可在面板有效期内回答；取消任一渠道会结束本题。面板与结果只在当前 MCP 进程内保留，结束后五分钟关闭服务并清理；进程断开立即取消，不恢复。面板 URL 是临时访问凭证，请勿分享；题目和回答不额外写入磁盘。重读结果不会再次执行操作，调用方须自行确保只执行一次。
-
-## 桌面 + 微信审核与最终确认
-
-双渠道由使用方代理打开面板并等待，可把以下规则放进使用方项目的 `AGENTS.md`；MCP 不会自行控制桌面 UI：
-
-1. 调用 `start_question`，立即在当前会话内置浏览器打开 `desktop_url`，随后在同一 MCP 连接调用 `wait_question({question_handle})`。不再另外创建无法撤回的原生问答卡片；仅需微信时仍用 `ask_wechat`。
-2. 以 `wait_question` 首先收到的有效回答为准，只处理一次。面板自动收起并取消另一边等待，迟到回复失效。用户主动撤回或变更指令仍按最新要求处理。单渠道出错可继续使用另一渠道；没有有效答案时保留待决定事项，取消用 `wait_question({question_handle, cancel:true})`。
-3. 日常修改和验证正常进行；发布、部署、推送、删除数据等关键操作准备完成后，先展示具体操作、目标、影响和验证结果，再双渠道请求最终确认。微信参数如下，两边摘要和选项一致：
-
-```json
-{
-  "context": "最终执行确认 · 项目名",
-  "question": "操作：发布已验证版本。目标：明确的环境和版本。影响：本次会改变哪些服务。验证：实际完成的检查结果。",
-  "options": ["同意执行", "暂不执行", "修改方案"],
-  "allow_text": false,
-  "timeout_seconds": 600
-}
-```
-
-最终确认有效期为 600 秒。只有首先明确选择“同意执行”才执行所描述的操作一次：桌面须明确选中该项，或微信返回 `answered`、`selected_index: 1` 且 `selected_option: 同意执行`。选“暂不执行”则保留成果并停止操作；选“修改方案”则调整后重新双渠道确认。取消、过期或两个渠道均不可用时不执行；操作或目标实质变化后重新确认，不复用旧答案。用户确认不替代平台权限审批。
+旧 `start_question`/`wait_question` 和 `src/call.mjs status|ask|dual` 暂留兼容：它们的浏览器面板仅监听 `127.0.0.1` 随机端口，使用随机题目 URL、来源校验和无外部资源页面；不能视为原生卡片同步，新 Skill 不调用它们。面板结果在当前 MCP 连接内保留五分钟后清理，断开时取消；URL 是临时访问凭证，不要分享。修改已加载服务后可能需要重连 MCP，避免中断其他会话的待答题。
 
 ## 验证与来源
 
-`npm test` 覆盖真实 MCP stdio、多进程并发与冷启动、乱序路由、独立取消/断开/超时、身份与本机认证、DPAPI、空闲退出、题号持久化和 24 小时重置、最终确认各分支，以及上下文过期恢复、重试竞态和防重复发送；另覆盖面板来源校验、选项与文字校验、双渠道首答竞态和独立取消。自动测试模拟微信，不发送真实消息。真实微信往返、双题乱序、无副作用最终确认及微信首答后桌面面板收起已验证；24 小时边界使用模拟时钟，未实际等待一天。
+`npm test` 覆盖真实 MCP stdio、直接 CLI 与 MCP 并发及冷启动、乱序路由、独立取消/断开/超时、来源对话校验与展示、身份和本机认证、DPAPI、空闲退出、题号持久化和 24 小时重置、最终确认各分支、上下文恢复与防重复发送，以及保留面板的兼容行为。自动测试模拟微信，不发送真实消息；CLI 测试拒绝加载 MCP SDK，验证新入口不依赖 MCP。
 
-微信 HTTP 字段参考腾讯发布的 [@tencent-weixin/openclaw-weixin 2.4.10](https://www.npmjs.com/package/@tencent-weixin/openclaw-weixin)，未加载 OpenClaw 运行时；MCP 使用官方 [TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)。微信协议或服务变化可能影响可用性。
+真实微信往返、双题乱序和无副作用最终确认此前已验证；新增 Skill 已通过真人双渠道验收：一题桌面首答后取消对应微信等待，另一题仍可由微信按数字题号回传。原生卡片自动撤回未实现，微信首答后卡片可能残留。24 小时边界使用模拟时钟，未实际等待一天。术语见 [GLOSSARY.md](GLOSSARY.md)。
+
+微信字段参考腾讯 [@tencent-weixin/openclaw-weixin 2.4.10](https://www.npmjs.com/package/@tencent-weixin/openclaw-weixin)，未加载 OpenClaw 运行时；兼容 MCP 使用官方 [TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)。微信服务或客户端变化可能影响可用性。

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { DualQuestions } from '../src/dual.mjs';
 import { createPanel } from '../src/panel.mjs';
 
-const question = { question: '执行确认？', context: '测试', options: ['同意执行', '暂不执行', '修改方案'], allow_text: false, timeout_seconds: 15 };
+const question = { conversation_title: '兼容面板测试', question: '执行确认？', context: '测试', options: ['同意执行', '暂不执行', '修改方案'], allow_text: false, timeout_seconds: 15 };
 function fakeAsk() {
   const calls = [];
   return { calls, ask: (input, { signal }) => new Promise(resolve => { calls.push({ input, signal, resolve }); }) };

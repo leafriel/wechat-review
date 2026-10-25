@@ -53,7 +53,7 @@ export async function startBroker({ store = new StateStore(), makeClient, idleMs
       }
       if (request.action !== 'ask') return respond({ status: 'error', message: '不支持的微信问答操作。' });
       const input = questionSchema.safeParse(request.input);
-      if (!input.success) return respond({ status: 'error', message: '微信问题参数无效。' });
+      if (!input.success) return respond({ status: 'error', message: `微信问题参数无效：${input.error.issues[0].message}` });
       armIdle();
       router.ask(input.data, { signal: controller.signal }).then(respond).catch(error => respond({ status: 'error', message: error.message }));
     });

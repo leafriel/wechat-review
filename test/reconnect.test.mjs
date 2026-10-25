@@ -5,7 +5,7 @@ import { QuestionRouter } from '../src/question.mjs';
 import { fakeWeChat, memoryStore, ownerMessage } from './helpers/fake-wechat.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const input = { question: '继续执行吗？', options: ['继续', '调整'], allow_text: false, timeout_seconds: 15 };
+const input = { conversation_id: 'reconnect-test', question: '继续执行吗？', options: ['继续', '调整'], allow_text: false, timeout_seconds: 15 };
 
 function staleContextChannel(onSend) {
   const channel = fakeWeChat();

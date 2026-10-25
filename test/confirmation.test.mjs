@@ -6,6 +6,7 @@ import { questionSchema } from '../src/schema.mjs';
 import { fakeWeChat, memoryStore, ownerMessage } from './helpers/fake-wechat.mjs';
 
 const confirmation = questionSchema.parse({
+  conversation_title: '最终确认验证对话',
   context: '最终执行确认 · 验证项目',
   question: '演示：在当前验证进程内标记一次确认成功。目标为内存标记，不修改文件或对外执行；选项和身份校验已验证。',
   options: ['同意执行', '暂不执行', '修改方案'], allow_text: false, timeout_seconds: 600,

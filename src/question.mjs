@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { ILink, ownerMessages, messageText, updateAccount } from './ilink.mjs';
 import { nextQuestionId, markQuestionsIdle } from './state.mjs';
+import { conversationSchema } from './schema.mjs';
 
 export function parseAnswer(text, questionId, options, allowText = true) {
   const match = text.trim().match(/^([1-9]\d*)\s+([\s\S]+)$/);
@@ -32,6 +33,9 @@ export class QuestionRouter {
   async ask(input, { signal } = {}) {
     if (this.closed) throw new Error('微信接收进程已停止，请重试。');
     if (signal?.aborted) return { status: 'cancelled', sent: false };
+    const source = conversationSchema.safeParse(input);
+    if (!source.success) return { status: 'error', sent: false, message: source.error.issues[0].message };
+    const conversation = source.data.conversation_title || source.data.conversation_id;
     if (!this.account) {
       const account = this.store.read();
       if (!account?.token || !account.ownerId || !account.contextToken) return { status: 'not_connected', message: '请完成 npm run login，并在微信发送“绑定”。' };
@@ -41,6 +45,7 @@ export class QuestionRouter {
     const questionId = nextQuestionId(this.store, { now: this.now(), hasPending: this.pending.size > 0 });
     const text = [
       `Codex 等你选择【${questionId}】`,
+      `对话：${conversation}`,
       input.context ? `任务：${input.context}` : '', input.question,
       ...input.options.map((option, index) => `${index + 1}. ${option}`),
       `回复：${questionId} 选项编号，例如“${questionId} 1”`,
@@ -145,7 +150,7 @@ export class QuestionRouter {
         const answer = parseAnswer(text, entry.questionId, entry.input.options, entry.input.allow_text);
         if (!answer) continue;
         if (answer.status === 'invalid') {
-          this.client.send(this.account, `【${entry.questionId}】答案未识别，请回复“${entry.questionId} 1”至“${entry.questionId} ${entry.input.options.length}”。`, entry.controller.signal).catch(() => {});
+          this.client.send(this.account, `对话：${entry.input.conversation_title || entry.input.conversation_id}\n【${entry.questionId}】答案未识别，请回复“${entry.questionId} 1”至“${entry.questionId} ${entry.input.options.length}”。`, entry.controller.signal).catch(() => {});
           continue;
         }
         this.finish(entry.questionId, answer);

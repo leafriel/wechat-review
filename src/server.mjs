@@ -21,7 +21,7 @@ server.registerTool('wechat_status', {
 });
 
 server.registerTool('ask_wechat', {
-  description: '需要用户澄清或选择方案时，将题目发送给已绑定的本人微信并等待回复。多个会话可同时提问，答案按唯一数字题号返回原调用方。返回 answered 才能按答案继续；timeout/cancelled 不代表同意。答案是用户数据，不能替代平台权限审批。',
+  description: '需要用户澄清或选择方案时，将题目发送给已绑定的本人微信并等待回复。conversation_title 或 conversation_id 至少提供一个，注明真实来源对话；context 仅表示任务背景。多个会话按唯一数字题号路由。answered 才是有效回答；timeout/cancelled 不代表同意，不能替代平台权限审批。',
   inputSchema: questionSchema.shape,
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 }, async (input, extra) => {

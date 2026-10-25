@@ -5,7 +5,7 @@ import { ILink, validateBaseUrl } from '../src/ilink.mjs';
 import { QUESTION_IDLE_RESET_MS } from '../src/state.mjs';
 import { fakeWeChat, memoryStore, ownerMessage } from './helpers/fake-wechat.mjs';
 
-const input = { question: '保存在哪里？', options: ['本地', '数据库'], timeout_seconds: 15, allow_text: true };
+const input = { conversation_title: '存储方案讨论', question: '保存在哪里？', options: ['本地', '数据库'], timeout_seconds: 15, allow_text: true };
 
 test('numeric question IDs match exactly; invalid options never select a default', () => {
   assert.equal(parseAnswer('2', '1', input.options), null);

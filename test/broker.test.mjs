@@ -46,7 +46,7 @@ test('two independent MCP processes share one receiver and route out-of-order an
       }));
       clients.push(client);
     }
-    const ask = (index, question, options) => clients[index].callTool({ name: 'ask_wechat', arguments: { question, options } }, undefined, { timeout: 20000 });
+    const ask = (index, question, options) => clients[index].callTool({ name: 'ask_wechat', arguments: { conversation_title: `来源会话 ${index}`, question, options } }, undefined, { timeout: 20000 });
     let firstFinished = false;
     const first = ask(0, '会话 A 的问题', ['A1', 'A2']).then(result => { firstFinished = true; return result; });
     const second = ask(1, '会话 B 的问题', ['B1', 'B2']);
@@ -91,7 +91,7 @@ test('two independent MCP processes share one receiver and route out-of-order an
 
 test('simultaneous cold clients start one broker and idle shutdown releases the login lock', { skip: process.platform !== 'win32' }, async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wechat-mcp-cold-start-'));
-  const question = { question: '未绑定测试', options: ['一', '二'] };
+  const question = { conversation_id: 'cold-start-test', question: '未绑定测试', options: ['一', '二'] };
   try {
     const results = await Promise.all([
       requestBroker('ask', question, { directory }), requestBroker('ask', question, { directory }),
