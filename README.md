@@ -7,10 +7,11 @@
 - **多会话并发**：同一 Windows 用户的多个会话共享一个接收器；每题独立路由，可乱序回答，某题取消、超时、发送失败或调用方断开不会取消其他题。
 - **简单题号**：全局数字从 `1` 递增，发送前持久保存，失败可能跳号。最后一道待答题结束后连续空闲满 24 小时，下一题从 `1` 开始；有待答题时不重置，空闲时间跨进程退出、重启和重新登录保留。旧计数器首次升级时从接收器启动开始记录空闲。
 - **选项、文字和取消**：微信回复 `1 2` 表示第 1 题选第 2 项；允许文字时可回复 `1 文字答案`；回复 `1 取消` 或 `1 cancel` 取消。只接受已绑定本人的单聊文字，裸数字、其他人的消息及群聊不会作为答案。
-- **本机安全存储**：账号、游标、上下文令牌、题号与 IPC 认证令牌用 Windows DPAPI 加密，默认保存在 `%LOCALAPPDATA%/CodexWeChatQuestion`；可用 `WECHAT_QUESTION_STATE_DIR` 覆盖目录。共享接收器使用需认证的命名管道，不开放 TCP 端口。
+- **桌面与微信同步**：可选的本机浏览器面板显示同一题，首先回答的渠道生效，题目和选项自动收起；桌面先答会取消本题微信等待，迟到回复失效。微信原消息仍保留为聊天记录，已有原生 Codex 问答卡片无法撤回。
+- **本机安全存储**：账号、游标、上下文令牌、题号与 IPC 认证令牌用 Windows DPAPI 加密，默认保存在 `%LOCALAPPDATA%/CodexWeChatQuestion`；可用 `WECHAT_QUESTION_STATE_DIR` 覆盖目录。共享接收器使用需认证的命名管道。可选桌面面板使用随机端口，仅监听 `127.0.0.1`，以每题随机 URL 和来源校验保护；不加载外部资源、不向页面提供微信凭据。
 - **按需运行**：首次提问自动启动接收器，空闲 60 秒退出；没有开机启动任务。电脑、网络和发起任务的客户端须保持运行；接收器异常退出时未完成的调用报错，不替用户选择，需要重新提问。
 
-MCP 只负责微信问答。它不接管现有桌面会话、不拦截内置提问或平台权限弹窗，不提供 `@codex` 聊天、自动任务完成通知，也不支持 macOS/Linux。是否继续执行由原调用代理根据结果决定。
+MCP 提供微信问答及可选桌面面板。它不接管现有桌面会话、不拦截内置提问或平台权限弹窗，不提供 `@codex` 聊天、自动任务完成通知，也不支持 macOS/Linux。是否继续执行由原调用代理根据结果决定。
 
 ## 安装与连接
 
@@ -35,7 +36,7 @@ tool_timeout_sec = 660
 enabled = true
 ```
 
-新增配置或升级已加载的服务后，可能需要重连 MCP。工具目录尚未刷新时，可在项目目录调用同一个 SDK 客户端：`node src/call.mjs status`，或将下述 JSON 经 stdin 传给 `node src/call.mjs ask`；结果仍返回当前调用方，无需另开或恢复 Codex 会话。
+新增配置或升级已加载的服务后，可能需要重连 MCP。工具目录尚未刷新时，可在项目目录调用同一个 SDK 客户端：`node src/call.mjs status`，或将下述 JSON 经 stdin 传给 `node src/call.mjs ask`（仅微信）或 `node src/call.mjs dual`（双渠道）。`dual` 首先输出面板 URL，调用方立即打开它，保持该进程运行，随后读取最终结果；无需另开或恢复 Codex 会话。
 
 ## 工具与回复
 
@@ -43,6 +44,8 @@ enabled = true
 | --- | --- |
 | `wechat_status` | 读取本地绑定状态，不发消息、不返回凭据；不代表实时登录一定有效 |
 | `ask_wechat` | 发送一题并等待本人回复，返回结构化结果 |
+| `start_question` | 使用相同参数发起双渠道题目，立即返回 `question_handle`、`desktop_url` 和 `expires_at`；调用方立即打开 URL |
+| `wait_question` | 同一 MCP 连接中用 `question_handle` 等待首答；可加 `cancel: true` 仅取消本题 |
 
 ```json
 {
@@ -56,14 +59,16 @@ enabled = true
 
 参数：`question` 为 1–1500 字符；`options` 为 2–6 个不重复选项，每项 1–200 字符；可选 `context` 最多 200 字符；`allow_text` 默认 `true`；`timeout_seconds` 为 15–600 的整数，默认 300 秒。文字答案最多 2000 字符。
 
-只有 `status: answered` 表示回答成功，包含 `question_id`、`question`、`answer`、`sent`、`answered_at`；选中选项时另有从 1 开始的 `selected_index` 和 `selected_option`。`cancelled`、`timeout`、`not_connected`、`error` 都不是同意，不能据此执行待确认操作。
+`ask_wechat` 只有 `status: answered` 表示回答成功，包含 `question_id`、`question`、`answer`、`sent`、`answered_at`；选中选项时另有从 1 开始的 `selected_index` 和 `selected_option`。`cancelled`、`timeout`、`not_connected`、`error` 都不是同意，不能据此执行待确认操作。
+
+双渠道结果另含 `question_handle` 和 `channel: desktop|wechat`；桌面首答没有微信 `question_id`、`sent` 字段。未绑定、发送失败或微信超时时仍可在面板有效期内回答；取消任一渠道会结束本题。面板与结果只在当前 MCP 进程内保留，结束后五分钟关闭服务并清理；进程断开立即取消，不恢复。面板 URL 是临时访问凭证，请勿分享；题目和回答不额外写入磁盘。重读结果不会再次执行操作，调用方须自行确保只执行一次。
 
 ## 桌面 + 微信审核与最终确认
 
-双渠道由使用方代理编排，可把以下规则放进使用方项目的 `AGENTS.md`；MCP 本身不会自动弹出桌面问题：
+双渠道由使用方代理打开面板并等待，可把以下规则放进使用方项目的 `AGENTS.md`；MCP 不会自行控制桌面 UI：
 
-1. 需求澄清、方案选择和最终确认，同时用桌面非阻塞提问工具（如 `request_user_input_async`）和 `ask_wechat` 发送相同的问题、选项与背景，不等一边答完才发另一边。
-2. 以首先收到的明确有效回答为准，只处理一次；桌面先回答则取消本题微信等待，微信先回答则撤回桌面问题，无法撤回时注明已处理。迟到回复不重复执行，用户主动撤回或变更指令仍按最新要求处理。单渠道出错可继续使用另一渠道；没有有效答案时保留待决定事项。
+1. 调用 `start_question`，立即在当前会话内置浏览器打开 `desktop_url`，随后在同一 MCP 连接调用 `wait_question({question_handle})`。不再另外创建无法撤回的原生问答卡片；仅需微信时仍用 `ask_wechat`。
+2. 以 `wait_question` 首先收到的有效回答为准，只处理一次。面板自动收起并取消另一边等待，迟到回复失效。用户主动撤回或变更指令仍按最新要求处理。单渠道出错可继续使用另一渠道；没有有效答案时保留待决定事项，取消用 `wait_question({question_handle, cancel:true})`。
 3. 日常修改和验证正常进行；发布、部署、推送、删除数据等关键操作准备完成后，先展示具体操作、目标、影响和验证结果，再双渠道请求最终确认。微信参数如下，两边摘要和选项一致：
 
 ```json
@@ -80,6 +85,6 @@ enabled = true
 
 ## 验证与来源
 
-`npm test` 运行 31 项测试：真实 MCP stdio、多进程并发与冷启动、乱序路由、独立取消/断开/超时、身份与本机认证、DPAPI、空闲退出、题号持久化和 24 小时重置、最终确认各分支，以及上下文过期恢复、重试竞态和防重复发送。微信响应为模拟，不发送真实消息。真实微信往返、双题乱序和无副作用最终确认也已验证；24 小时边界使用模拟时钟，未实际等待一天；桌面 + 微信首答竞速尚未完整联测。
+`npm test` 覆盖真实 MCP stdio、多进程并发与冷启动、乱序路由、独立取消/断开/超时、身份与本机认证、DPAPI、空闲退出、题号持久化和 24 小时重置、最终确认各分支，以及上下文过期恢复、重试竞态和防重复发送；另覆盖面板来源校验、选项与文字校验、双渠道首答竞态和独立取消。自动测试模拟微信，不发送真实消息。真实微信往返、双题乱序、无副作用最终确认及微信首答后桌面面板收起已验证；24 小时边界使用模拟时钟，未实际等待一天。
 
 微信 HTTP 字段参考腾讯发布的 [@tencent-weixin/openclaw-weixin 2.4.10](https://www.npmjs.com/package/@tencent-weixin/openclaw-weixin)，未加载 OpenClaw 运行时；MCP 使用官方 [TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)。微信协议或服务变化可能影响可用性。

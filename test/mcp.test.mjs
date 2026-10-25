@@ -18,13 +18,21 @@ test('real MCP stdio handshake lists tools and returns structured unpaired statu
   try {
     await client.connect(transport);
     const listed = await client.listTools();
-    assert.deepEqual(listed.tools.map(tool => tool.name).sort(), ['ask_wechat', 'wechat_status']);
+    assert.deepEqual(listed.tools.map(tool => tool.name).sort(), ['ask_wechat', 'start_question', 'wait_question', 'wechat_status']);
     const status = await client.callTool({ name: 'wechat_status', arguments: {} });
     assert.equal(status.structuredContent.connected, false);
     const answer = await client.callTool({ name: 'ask_wechat', arguments: { question: '测试？', options: ['选项一', '选项二'] } });
     assert.equal(answer.structuredContent.status, 'not_connected');
     const invalid = await client.callTool({ name: 'ask_wechat', arguments: { question: '测试？', options: ['重复', '重复'] } });
     assert.equal(invalid.isError, true);
+    const pending = await client.callTool({ name: 'start_question', arguments: { question: '双渠道测试？', options: ['a', 'b'], allow_text: false } });
+    const { desktop_url, question_handle } = pending.structuredContent;
+    assert.equal((await fetch(desktop_url)).status, 200);
+    const selected = await fetch(desktop_url + 'answer', { method: 'POST', headers: { Origin: new URL(desktop_url).origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ selected_index: 2 }) });
+    assert.equal(selected.status, 200);
+    const finished = await client.callTool({ name: 'wait_question', arguments: { question_handle } });
+    assert.equal(finished.structuredContent.channel, 'desktop');
+    assert.equal(finished.structuredContent.selected_option, 'b');
   } finally {
     await client.close();
     await stopBroker(dir);
